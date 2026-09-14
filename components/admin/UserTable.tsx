@@ -3,9 +3,22 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
-import { createUser, updateUserRole, updateUserStatus } from "@/app/admin/users/actions";
-import { createUserSchema, type CreateUserInput } from "@/lib/validations/user";
+import { Plus, Pencil, KeyRound } from "lucide-react";
+import {
+  createUser,
+  updateUserRole,
+  updateUserStatus,
+  updateUserProfile,
+  changeUserPassword,
+} from "@/app/admin/users/actions";
+import {
+  createUserSchema,
+  type CreateUserInput,
+  updateUserProfileSchema,
+  type UpdateUserProfileInput,
+  changePasswordSchema,
+  type ChangePasswordInput,
+} from "@/lib/validations/user";
 import { USER_ROLES, type UserRole, type UserStatus } from "@/lib/constants";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +40,8 @@ export interface UserRow {
 
 export function UserTable({ users, currentUserId }: { users: UserRow[]; currentUserId: string }) {
   const [creating, setCreating] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [resettingUser, setResettingUser] = useState<UserRow | null>(null);
 
   return (
     <div className="space-y-6">
@@ -50,7 +65,13 @@ export function UserTable({ users, currentUserId }: { users: UserRow[]; currentU
         </thead>
         <tbody>
           {users.map((u) => (
-            <UserRowDesktop key={u._id} user={u} isSelf={u._id === currentUserId} />
+            <UserRowDesktop
+              key={u._id}
+              user={u}
+              isSelf={u._id === currentUserId}
+              onEdit={() => setEditingUser(u)}
+              onResetPassword={() => setResettingUser(u)}
+            />
           ))}
         </tbody>
       </table>
@@ -58,11 +79,19 @@ export function UserTable({ users, currentUserId }: { users: UserRow[]; currentU
       {/* Mobile stacked cards */}
       <div className="space-y-3 md:hidden">
         {users.map((u) => (
-          <UserRowMobile key={u._id} user={u} isSelf={u._id === currentUserId} />
+          <UserRowMobile
+            key={u._id}
+            user={u}
+            isSelf={u._id === currentUserId}
+            onEdit={() => setEditingUser(u)}
+            onResetPassword={() => setResettingUser(u)}
+          />
         ))}
       </div>
 
       <CreateUserDialog open={creating} onClose={() => setCreating(false)} />
+      {editingUser && <EditUserDialog user={editingUser} onClose={() => setEditingUser(null)} />}
+      {resettingUser && <ResetPasswordDialog user={resettingUser} onClose={() => setResettingUser(null)} />}
     </div>
   );
 }
@@ -89,7 +118,14 @@ function useUserRowActions(user: UserRow) {
   return { error, isPending, changeRole, toggleStatus };
 }
 
-function UserRowDesktop({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
+interface RowActionProps {
+  user: UserRow;
+  isSelf: boolean;
+  onEdit: () => void;
+  onResetPassword: () => void;
+}
+
+function UserRowDesktop({ user, isSelf, onEdit, onResetPassword }: RowActionProps) {
   const { error, isPending, changeRole, toggleStatus } = useUserRowActions(user);
 
   return (
@@ -119,21 +155,39 @@ function UserRowDesktop({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
         {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "Never"}
       </td>
       <td className="px-6 py-3">
-        <button
-          type="button"
-          onClick={toggleStatus}
-          disabled={isPending || isSelf}
-          className="font-mono text-xs uppercase tracking-widest text-foreground-secondary transition-colors duration-base hover:text-foreground disabled:opacity-40"
-        >
-          {user.status === "ACTIVE" ? "Disable" : "Enable"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit"
+            className="-m-1.5 p-1.5 text-foreground-muted transition-colors duration-base hover:text-foreground"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onResetPassword}
+            aria-label="Reset password"
+            className="-m-1.5 p-1.5 text-foreground-muted transition-colors duration-base hover:text-foreground"
+          >
+            <KeyRound className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleStatus}
+            disabled={isPending || isSelf}
+            className="font-mono text-xs uppercase tracking-widest text-foreground-secondary transition-colors duration-base hover:text-foreground disabled:opacity-40"
+          >
+            {user.status === "ACTIVE" ? "Disable" : "Enable"}
+          </button>
+        </div>
         {error && <p className="mt-1 text-xs text-foreground-secondary">{error}</p>}
       </td>
     </tr>
   );
 }
 
-function UserRowMobile({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
+function UserRowMobile({ user, isSelf, onEdit, onResetPassword }: RowActionProps) {
   const { error, isPending, changeRole, toggleStatus } = useUserRowActions(user);
 
   return (
@@ -147,7 +201,7 @@ function UserRowMobile({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
         </div>
         <Badge variant={user.status === "ACTIVE" ? "solid" : "outline"}>{user.status}</Badge>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Select
           value={user.role}
           disabled={isPending || (isSelf && user.role === "ADMIN")}
@@ -160,6 +214,22 @@ function UserRowMobile({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
             </option>
           ))}
         </Select>
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Edit"
+          className="-m-1.5 p-1.5 text-foreground-muted transition-colors duration-base hover:text-foreground"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onResetPassword}
+          aria-label="Reset password"
+          className="-m-1.5 p-1.5 text-foreground-muted transition-colors duration-base hover:text-foreground"
+        >
+          <KeyRound className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={toggleStatus}
@@ -244,6 +314,111 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating…" : "Create"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function EditUserDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<UpdateUserProfileInput>({
+    resolver: zodResolver(updateUserProfileSchema),
+    defaultValues: { name: user.name, email: user.email },
+  });
+
+  async function onSubmit(data: UpdateUserProfileInput) {
+    setServerError(null);
+    const result = await updateUserProfile(user._id, data);
+    if (!result.success) {
+      setServerError(result.error);
+      return;
+    }
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="Edit user">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="edit-name">
+            <TechnicalLabel>Name</TechnicalLabel>
+          </label>
+          <Input id="edit-name" {...register("name")} />
+          {errors.name && <p className="text-xs text-foreground-secondary">{errors.name.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="edit-email">
+            <TechnicalLabel>Email</TechnicalLabel>
+          </label>
+          <Input id="edit-email" type="email" {...register("email")} />
+          {errors.email && <p className="text-xs text-foreground-secondary">{errors.email.message}</p>}
+        </div>
+        {serverError && (
+          <p role="alert" className="text-sm text-foreground-secondary">
+            {serverError}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function ResetPasswordDialog({ user, onClose }: { user: UserRow; onClose: () => void }) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { password: "" },
+  });
+
+  async function onSubmit(data: ChangePasswordInput) {
+    setServerError(null);
+    const result = await changeUserPassword(user._id, data);
+    if (!result.success) {
+      setServerError(result.error);
+      return;
+    }
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} title={`Reset password — ${user.name}`}>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="reset-password">
+            <TechnicalLabel>New password</TechnicalLabel>
+          </label>
+          <Input id="reset-password" type="password" autoComplete="new-password" {...register("password")} />
+          {errors.password && <p className="text-xs text-foreground-secondary">{errors.password.message}</p>}
+        </div>
+        {serverError && (
+          <p role="alert" className="text-sm text-foreground-secondary">
+            {serverError}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving…" : "Set password"}
           </Button>
         </div>
       </form>
