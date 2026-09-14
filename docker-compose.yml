@@ -1,0 +1,14 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: null-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: null-dev
+    volumes:
+      - mongodb-data:/data/db
+
+volumes:
+  mongodb-data:

@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/*
+ * NULL / uses ONE fixed monochrome theme — no light/dark toggle, no
+ * prefers-color-scheme switching, no per-post/per-article colors, ever.
+ * All color lives here. See PROMPT.md §3 and §6.
+ */
+
+:root {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@theme {
+  /* Palette — PROMPT.md §3 */
+  --color-background: #090909;
+  --color-surface: #101010;
+  --color-elevated: #151515;
+  --color-border: #272727;
+  --color-border-strong: #3a3a3a;
+  --color-foreground: #f2f2f2;
+  --color-foreground-secondary: #a0a0a0;
+  --color-foreground-muted: #626262;
+
+  /*
+   * Spacing is intentionally left at Tailwind's default 4px-per-step
+   * scale — it already matches the spec's 4/8/12/16/24/32/48/64/96/128/160
+   * sequence one-for-one (p-1=4px … p-4=16px … p-40=160px). See
+   * lib/design-tokens.ts for the explicit step -> utility map.
+   */
+
+  /*
+   * Radius — mostly-square UI, 0-4px default (§6). Every step above "sm"
+   * collapses to the same 4px cap so an accidental rounded-xl/2xl/3xl
+   * can't sneak in a rounded-card look anywhere in the app.
+   */
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+
+  /* Motion durations — fast and subtle (§36) */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+html {
+  /* Defensive floor against any stray overflow on mobile (CLAUDE.md: "no horizontal overflow"). */
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-foreground);
+  color: var(--color-background);
+}
+
+/* Visible focus everywhere (§37) — square, no glow/blur. */
+:focus-visible {
+  outline: 1px solid var(--color-foreground);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
